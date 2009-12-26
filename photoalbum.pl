@@ -36,14 +36,14 @@ my $pdf = new PDF::Create(
 	'CreationDate' => [ localtime ],
 );
 my $psz = $pdf->get_page_size($pagesize);
+
+print "psz: ", join(', ', @$psz), "\n";
 my $root = $pdf->new_page('MediaBox' => $psz);
 
-my @images = (get_images)[0..5];
+my @images = (get_images)[0..20];
 my $page = $root->new_page;
 my ($accum, $y) = (0, 0);
 my ($pw, $ph) = (@$psz)[2,3];
-
-
 
 sub decide_layout {
 	my $n = scalar @_;
@@ -65,46 +65,64 @@ sub decide_layout {
 
 sub max {
 	my $max;
-
-	foreach (@_) {
-		$max = $_ unless $max && $max > $_;
-	}
+	foreach (@_) { $max = $_ unless $max && $max > $_; }
 	return $max;
+}
+
+
+sub fit_img {
+	my ($img, $slot_w, $slot_h) = @_;
+
+	# aspect ratio
+	my $ratio = $$img{height} / $$img{width};
+	print "ratio: $ratio\n";
+	return ($slot_w, int($slot_h * $ratio));
+}
+
+
+sub place_img {
+	my ($page, $img, $w, $h, $x, $y) = @_;
+
+	my $xscale = $w / $$img{width};
+
+	print "Placing:  xpos => $x, ypos => $y\n";
+
+	$page->image(image => $img,
+		xpos => $x,
+		ypos => $y,
+		xscale => $xscale,
+		yscale => $xscale,
+	);
 }
 
 sub layout {
 	my ($page, $pw, $ph, @images) = @_;
-
 	my $max_width = max map { $$_{width} } @images;
 	my $max_height = max map { $$_{height} } @images;
+	my ($w, $h) = decide_layout(@images);
+	my ($slot_w, $slot_h) = ($pw / $w, $ph / $h);
 
-	print "max: $max_width : $max_height\n";
-	exit;
+	# margins
+	print "max: $max_width : $max_height - grid: $w x $h",
+	    " ($slot_w x $slot_h)\n";
+	my $margin = 20;
+
+	for (my $j = 0; $j < $h; $j++) {
+		for (my $i = 0; $i < $w; $i++) {
+			my $im = shift @images;
+			my ($w, $h) = fit_img($im, $slot_w, $slot_h);
+			print "orig: $$im{width} x $$im{height} - $w x $h\n";
+			place_img($page, $im, $w, $h, $i * $slot_w, $j * $slot_h);
+		}
+	}
 }
 
 while (@images) {
-	my $n = 2;
+	my $n = 6;
 	my @batch = map { $pdf->image($_) } splice @images, 0, $n;
 	my $page = $root->new_page;
 
 	layout($page, $pw, $ph, @batch);
-
-	my $imup = shift @images;
-	foreach my $im ($imup) {
-		my $img = $pdf->image($im);
-		my $xscale = $pw / $$img{width};
-		my $img_h = $$img{height} * $xscale;
-		if ($accum + $img_h  > $ph) {
-			$page = $root->new_page;
-			$accum = $$img{height} * $xscale;
-		}
-		my $y = $ph - $accum;
-		$page->image(image => $img,
-			xpos => 0, ypos => $y,
-			xscale => $xscale,
-			yscale => $xscale,
-		);
-	}
 }
 
 $pdf->close;
