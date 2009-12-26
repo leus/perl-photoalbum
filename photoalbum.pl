@@ -25,7 +25,6 @@ sub scale {
 	return ($default_width, int($default_width * $ratio));
 }
 
-my $pagesize = 'Letter';
 my $filename = 'album.pdf';
 my $author = 'Leonardo Herrera';
 my $title = '2009';
@@ -37,9 +36,7 @@ my $pdf = new PDF::Create(
 	'Title'        => $title,
 	'CreationDate' => [ localtime ],
 );
-my $psz = $pdf->get_page_size($pagesize);
-
-print "psz: ", join(', ', @$psz), "\n";
+my $psz = [0, 0, 8.25 * 75, 10.75 * 75 ];
 my $root = $pdf->new_page('MediaBox' => $psz);
 
 #my @images = (get_images)[0..40];
