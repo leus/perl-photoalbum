@@ -7,17 +7,38 @@ use Switch 'Perl6';
 use File::Find;
 use PDF::Create;
 use Image::ExifTool;
+use Image::Magick;
+
+my $im = Image::Magick->new;
+sub proc_image {
+	my ($path, $short_name) = @_;
+	$image->Read($path);
+
+	$image->Set(quality => 300);
+
+	# at 300dpi, a 9cm image must be of at least 1.060 pixels
+	$image->AdaptiveResize(width => 1100, blur => -1);
+
+	my $name = './Album/' . $short_name;
+	$image->Write($name);
+	return $name;
+}
+
 
 sub get_images {
 	my @ret;
+	my $c = 0;
 
 	find({wanted => sub {
 		if (/\.jpg/) {
-			push @ret, $File::Find::name;
+			my $fname = proc_image($File::Find::name, $_);
+			push @ret, $fname if $fname;
 		}
-	}, follow => 1}, './JPEG');
+		$File::Find::prune = 1 if $c++ > 5;
+	}, follow => 1}, './SourceImages');
 	return @ret;
 }
+
 
 sub scale {
 	my ($w, $h, $default_width) = @_;
